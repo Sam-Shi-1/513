@@ -1,78 +1,269 @@
 <?php
-$current_dir_level = 0;
-include 'includes/header.php';
+$current_dir_level = 1;
+include '../includes/header.php';
+
+$base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'];
+$project_path = str_replace($_SERVER['DOCUMENT_ROOT'], '', dirname(dirname(__DIR__)));
+$image_base_url = $base_url . $project_path . '/assets/images/products/';
+$default_image_url = $image_base_url . 'default.jpg';
+
+$cart_total_quantity = 0;
+if (isset($_SESSION['cart'])) {
+    foreach ($_SESSION['cart'] as $item) {
+        $cart_total_quantity += $item['quantity'];
+    }
+}
+
+// Initialize cart if not exists
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = [];
+}
+
+if (isset($_GET['clear_cart']) && $_GET['clear_cart'] === 'true') {
+    $_SESSION['cart'] = [];
+    $_SESSION['success_message'] = "Shopping cart has been cleared successfully.";
+    header("Location: index.php");
+    exit;
+}
+
+// Handle quantity updates
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_quantity'])) {
+    $product_id = $_POST['product_id'];
+    $quantity = intval($_POST['quantity']);
+    
+    if ($quantity <= 0) {
+        // Remove item from cart
+        foreach ($_SESSION['cart'] as $key => $item) {
+            if ($item['product_id'] == $product_id) {
+                unset($_SESSION['cart'][$key]);
+                $_SESSION['success_message'] = "Item removed from cart";
+                break;
+            }
+        }
+    } else {
+        // Update quantity
+        $itemFound = false;
+        foreach ($_SESSION['cart'] as &$item) {
+            if ($item['product_id'] == $product_id) {
+                $item['quantity'] = $quantity;
+                $itemFound = true;
+                $_SESSION['success_message'] = "Quantity updated successfully";
+                break;
+            }
+        }
+        
+        if (!$itemFound) {
+            $_SESSION['error_message'] = "Item not found in cart";
+        }
+    }
+    
+    // Reindex array
+    $_SESSION['cart'] = array_values($_SESSION['cart']);
+    header("Location: index.php");
+    exit;
+}
+
+// Handle item removal
+if (isset($_GET['remove'])) {
+    $remove_id = $_GET['remove'];
+    $itemFound = false;
+    
+    foreach ($_SESSION['cart'] as $key => $item) {
+        if ($item['product_id'] == $remove_id) {
+            unset($_SESSION['cart'][$key]);
+            $itemFound = true;
+            $_SESSION['success_message'] = "Item removed from cart";
+            break;
+        }
+    }
+    
+    if (!$itemFound) {
+        $_SESSION['error_message'] = "Item not found in cart";
+    }
+    
+    $_SESSION['cart'] = array_values($_SESSION['cart']);
+    header("Location: index.php");
+    exit;
+}
+
+$unique_cart = [];
+foreach ($_SESSION['cart'] as $item) {
+    $product_id = $item['product_id'];
+    if (isset($unique_cart[$product_id])) {
+        $unique_cart[$product_id]['quantity'] += $item['quantity'];
+    } else {
+        $unique_cart[$product_id] = $item;
+    }
+}
+if (count($unique_cart) != count($_SESSION['cart'])) {
+    $_SESSION['cart'] = array_values($unique_cart);
+}
+
+// Calculate totals
+$subtotal = 0;
+$total_items = 0;
+foreach ($_SESSION['cart'] as $item) {
+    $subtotal += $item['price'] * $item['quantity'];
+    $total_items += $item['quantity'];
+}
+$tax = $subtotal * 0.1; // 10% tax
+$total = $subtotal + $tax;
 ?>
 
-<div class="hero-section bg-primary text-white py-5 rounded mb-4">
-    <div class="container text-center">
-        <h1 class="display-4">Welcome to GameVault</h1>
-        <p class="lead">Genuine Game CD Keys • Premium Gaming Merchandise • Professional Gaming Gear</p>
-        <a href="products/index.php" class="btn btn-light btn-lg mt-3">Shop Now</a>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="fas fa-key fa-3x text-primary mb-3"></i>
-                <h5 class="card-title">Instant CD Key Delivery</h5>
-                <p class="card-text">Receive CD keys immediately after purchase, fast and convenient</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="fas fa-shield-alt fa-3x text-success mb-3"></i>
-                <h5 class="card-title">100% Genuine Guarantee</h5>
-                <p class="card-text">All products are official and authentic, safe and reliable</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="fas fa-shipping-fast fa-3x text-warning mb-3"></i>
-                <h5 class="card-title">Fast Shipping</h5>
-                <p class="card-text">Physical goods shipped within 24 hours, express delivery</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<h2 class="mb-4">Popular Products</h2>
 <div class="row">
-    <?php
-    $demo_products = [
-        ['id' => 1, 'name' => 'League of Legends 1350 RP', 'price' => '68.00', 'type' => 'cdk', 'desc' => 'League of Legends game points CD Key, instant delivery'],
-        ['id' => 2, 'name' => 'Genshin Impact Genesis Crystals', 'price' => '98.00', 'type' => 'cdk', 'desc' => 'Genshin Impact in-game currency CD Key'],
-        ['id' => 3, 'name' => 'PUBG UC Coins', 'price' => '88.00', 'type' => 'cdk', 'desc' => 'PUBG game currency CD Key'],
-        ['id' => 4, 'name' => 'Gaming Mechanical Keyboard', 'price' => '299.00', 'type' => 'physical', 'desc' => 'RGB backlit mechanical keyboard, blue switches'],
-        ['id' => 5, 'name' => 'League of Legends Yasuo Figure', 'price' => '199.00', 'type' => 'physical', 'desc' => 'High-quality Yasuo figure model'],
-        ['id' => 6, 'name' => 'Gaming Mouse', 'price' => '89.00', 'type' => 'physical', 'desc' => 'High-precision gaming mouse with RGB lighting']
-    ];
-    
-    foreach ($demo_products as $product):
-    ?>
-    <div class="col-md-4 mb-4">
-        <div class="card h-100">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title"><?php echo $product['name']; ?></h5>
-                <p class="card-text flex-grow-1"><?php echo $product['desc']; ?></p>
-                <div class="mt-auto">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="h5 text-primary">$<?php echo $product['price']; ?></span>
-                        <span class="badge bg-<?php echo $product['type'] == 'cdk' ? 'info' : 'secondary'; ?>">
-                            <?php echo $product['type'] == 'cdk' ? 'CD Key' : 'Physical'; ?>
-                        </span>
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Shopping Cart</h2>
+            <?php if(!empty($_SESSION['cart'])): ?>
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#clearCartModal">
+                <i class="fas fa-trash me-2"></i>Clear Cart
+            </button>
+            <?php endif; ?>
+        </div>
+        
+        <?php 
+        // Display success/error messages
+        if (isset($_SESSION['success_message'])): 
+        ?>
+            <div class="alert alert-success alert-dismissible fade show">
+                <?php echo $_SESSION['success_message']; ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <?php unset($_SESSION['success_message']); ?>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['error_message'])): ?>
+            <div class="alert alert-danger alert-dismissible fade show">
+                <?php echo $_SESSION['error_message']; ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <?php unset($_SESSION['error_message']); ?>
+        <?php endif; ?>
+        
+        <?php if(empty($_SESSION['cart'])): ?>
+            <div class="alert alert-info">
+                <div class="text-center py-4">
+                    <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                    <h4>Your cart is empty</h4>
+                    <p class="text-muted">Add some items to your cart to continue shopping</p>
+                    <a href="../products/index.php" class="btn btn-primary mt-2">Continue shopping</a>
+                </div>
+            </div>
+        <?php else: ?>
+            <?php foreach ($_SESSION['cart'] as $item): ?>
+            <div class="card mb-3 cart-item" data-product-id="<?php echo $item['product_id']; ?>">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-2">
+                            <?php
+                            $product_image_url = !empty($item['product_image']) ? 
+                                $image_base_url . htmlspecialchars($item['product_image']) : 
+                                $default_image_url;
+                            ?>
+                            <img src="<?php echo $product_image_url; ?>" 
+                                class="img-fluid rounded" 
+                                alt="<?php echo htmlspecialchars($item['product_name']); ?>"
+                                onerror="this.src='<?php echo $default_image_url; ?>'">
+                        </div>
+                        <div class="col-md-4">
+                            <h5><?php echo htmlspecialchars($item['product_name']); ?></h5>
+                            <p class="text-muted">Product ID: <?php echo $item['product_id']; ?></p>
+                            <p class="text-primary">$<?php echo number_format($item['price'], 2); ?> each</p>
+                        </div>
+                        <div class="col-md-3">
+                            <form method="POST" class="quantity-form">
+                                <input type="hidden" name="product_id" value="<?php echo $item['product_id']; ?>">
+                                <div class="input-group">
+                                    <button type="button" class="btn btn-outline-secondary decrement-btn">-</button>
+                                    <input type="number" name="quantity" value="<?php echo $item['quantity']; ?>" 
+                                        min="1" max="99" class="form-control text-center quantity-input">
+                                    <button type="button" class="btn btn-outline-secondary increment-btn">+</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-end">
+                                <strong class="h5">$<?php echo number_format($item['price'] * $item['quantity'], 2); ?></strong>
+                                <div class="mt-2">
+                                    <a href="?remove=<?php echo $item['product_id']; ?>" class="btn btn-sm btn-outline-danger" 
+                                       onclick="return confirm('Are you sure you want to remove this item from your cart?')">
+                                        <i class="fas fa-times me-1"></i>Remove
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <a href="products/view.php?id=<?php echo $product['id']; ?>" class="btn btn-primary w-100 mt-2">View Details</a>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card sticky-top" style="top: 20px;">
+            <div class="card-header">
+                <h5 class="mb-0">Order Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Items (<?php echo $total_items; ?>):</span>
+                    <span>$<?php echo number_format($subtotal, 2); ?></span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Tax (10%):</span>
+                    <span>$<?php echo number_format($tax, 2); ?></span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between mb-3">
+                    <strong>Total:</strong>
+                    <strong class="h5">$<?php echo number_format($total, 2); ?></strong>
+                </div>
+                
+                <?php if(!empty($_SESSION['cart'])): ?>
+                    <a href="checkout.php" class="btn btn-primary btn-lg w-100">Proceed to Checkout</a>
+                <?php else: ?>
+                    <button class="btn btn-secondary btn-lg w-100" disabled>Proceed to Checkout</button>
+                <?php endif; ?>
+                
+                <div class="text-center mt-3">
+                    <a href="../products/index.php" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-shopping-bag me-2"></i>Continue Shopping
+                    </a>
                 </div>
             </div>
         </div>
     </div>
-    <?php endforeach; ?>
 </div>
 
-<?php include 'includes/footer.php'; ?>
+<div class="modal fade" id="clearCartModal" tabindex="-1" aria-labelledby="clearCartModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="clearCartModalLabel">Clear Shopping Cart</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="mb-3">
+                    <i class="fas fa-exclamation-triangle fa-3x text-warning"></i>
+                </div>
+                <h5>Are you sure?</h5>
+                <p class="text-muted">This will remove all items from your shopping cart. This action cannot be undone.</p>
+                <div class="alert alert-info">
+                    <small>
+                        <i class="fas fa-info-circle me-2"></i>
+                        You have <strong><?php echo count($_SESSION['cart']); ?> item(s)</strong> in your cart totaling 
+                        <strong>$<?php echo number_format($total, 2); ?></strong>
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="?clear_cart=true" class="btn btn-danger">
+                    <i class="fas fa-trash me-2"></i>Clear Cart
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php include '../includes/footer.php'; ?>
